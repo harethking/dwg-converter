@@ -39,12 +39,14 @@ app.post("/convert", (req, res) => {
     // dwg2dxf من مكتبة LibreDWG
     execFile("dwg2dxf", ["-o", outPath, inPath], { timeout: 60000 }, async (e, stdout, stderr) => {
       try {
-        if (e) {
-          const msg = (stderr || e.message || "").toString().slice(0, 500);
+        // LibreDWG قد يرجع رمز خطأ مع تحذيرات بسيطة رغم نجاح التحويل، فنعتمد على وجود الملف
+        const dxf = await fs.readFile(outPath).catch(() => null);
+        if (!dxf || !dxf.length) {
+          const msg = (stderr || (e && e.message) || "").toString().slice(0, 500);
           return res.status(422).send("conversion failed: " + msg);
         }
-        const dxf = await fs.readFile(outPath, "utf8");
-        res.type("text/plain; charset=utf-8").send(dxf);
+        // نرسل البايتات كما هي حتى لا يتلف النص العربي في الملفات القديمة (ANSI_1256)
+        res.type("application/octet-stream").send(dxf);
       } catch (x) {
         res.status(500).send("error: " + x.message);
       } finally {
